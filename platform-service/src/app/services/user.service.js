@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import UserRepository from '../../domain/repositories/user.repository.js';
+import AttendanceRepository from '../../domain/repositories/attendance.repo.js';
 import AppError from '../../core/errors/AppError.js';
 import UserCreatedEvent from '../../domain/events/UserCreatedEvent.js';
 import { publish } from '../../infrastructure/messaging/rabbitmqConnection.js';
@@ -10,6 +11,7 @@ const USER_CACHE_TTL = parseInt(process.env.USER_CACHE_TTL || '300', 10);
 export default class UserService {
   constructor() {
     this.userRepo = new UserRepository();
+    this.attendanceRepo = new AttendanceRepository();
     try { this.redis = getRedisClient(); } catch (e) { this.redis = null; }
   }
 
@@ -47,6 +49,16 @@ export default class UserService {
       if (this.redis) await this.redis.set(`user:${userId}`, JSON.stringify(profile), { EX: USER_CACHE_TTL });
     } catch (e) {}
     return profile;
+  }
+
+  async getAttendance(userId) {
+    const records = await this.attendanceRepo.findByUserId(userId);
+    return records.map(rec => ({
+      month: rec.month,
+      present: rec.present,
+      cl: rec.cl,
+      sl: rec.sl
+    }));
   }
 
   async handleAuthLoginEvent({ userId, email }) {

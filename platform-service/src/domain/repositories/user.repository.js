@@ -1,4 +1,5 @@
 import UserModel from '../models/UserModel.js';
+
 export default class UserRepository {
   async create(payload) {
     const user = new UserModel(payload);
