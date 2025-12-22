@@ -1,5 +1,5 @@
 import express from 'express';
-import { register, profile } from '../controllers/user.controller.js';
+import { register, profile, attendance } from '../controllers/user.controller.js';
 import { authMiddleware } from '../../core/middleware/authMiddleware.js';
 import { registerSchema } from '../validations/user.validation.js';
 import AppError from '../../core/errors/AppError.js';
@@ -14,5 +14,6 @@ const validate = (schema) => (req, res, next) => {
 
 router.post('/register', validate(registerSchema), register);
 router.get('/profile', authMiddleware, profile);
+router.get('/attendance', authMiddleware, attendance);
 
 export default router;

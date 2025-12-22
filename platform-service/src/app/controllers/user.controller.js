@@ -22,3 +22,14 @@ export const profile = async (req, res, next) => {
     next(err);
   }
 };
+
+export const attendance = async (req, res, next) => {
+  try {
+    const userId = req.user?.id || (req.user && req.user.user && req.user.user.id);
+    if (!userId) return res.status(400).json({ success: false, message: 'User id missing in token' });
+    const attendance = await userService.getAttendance(userId);
+    return successResponse(res, attendance, 200);
+  } catch (err) {
+    next(err);
+  }
+};
