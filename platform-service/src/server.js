@@ -1,64 +1,39 @@
-import dotenv from "dotenv";
+import dotenv from 'dotenv';
 dotenv.config();
-import app from "./app.js";
-import mongoose from "mongoose";
-import { createClient } from "redis";
-import amqp from "amqplib";
 
+import app from './app.js';
+import { connectDB } from './infrastructure/database/mongoose.js';
+import { connectRedis } from './infrastructure/cache/redisClient.js';
+import { connectRabbitMQ, consume } from './infrastructure/messaging/rabbitmqConnection.js';
+import UserService from './app/services/user.service.js';
+import pino from 'pino';
+
+const logger = pino();
 const PORT = process.env.PORT || 3001;
 
-/*  MongoDB Connection */
-const connectMongoDB = async () => {
+const start = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log(" MongoDB Connected");
+    await connectDB(process.env.MONGO_URI);
+    await connectRedis(process.env.REDIS_URL);
+    await connectRabbitMQ(process.env.RABBITMQ_URL);
+
+    const userService = new UserService();
+
+    // consume auth events
+    await consume('auth.login', async (payload) => {
+      logger.info({ payload }, 'Received auth.login');
+      try { await userService.handleAuthLoginEvent(payload); } catch (e) { logger.error({ e }, 'handleAuthLoginEvent failed'); }
+    });
+    await consume('auth.logout', async (payload) => {
+      logger.info({ payload }, 'Received auth.logout');
+      try { await userService.handleAuthLogoutEvent(payload); } catch (e) { logger.error({ e }, 'handleAuthLogoutEvent failed'); }
+    });
+
+    app.listen(PORT, () => logger.info(`✅ User Service running on ${PORT}`));
   } catch (err) {
-    console.error(" MongoDB Connection Failed:", err);
+    logger.error({ err }, 'Failed to start User Service');
     process.exit(1);
   }
 };
 
-/* Redis Connection */
-const connectRedis = async () => {
-  const client = createClient({ url: process.env.REDIS_URL });
-  client.on("error", (err) => console.error(" Redis Error:", err));
-  await client.connect();
-  console.log(" Redis Connected");
-};
-
-/*  RabbitMQ Connection with Retry Logic */
-const connectRabbitMQ = async (retries = 10, delay = 5000) => {
-  while (retries) {
-    try {
-      const connection = await amqp.connect(process.env.RABBITMQ_URL);
-      const channel = await connection.createChannel();
-      await channel.assertQueue("authQueue");
-      console.log(" RabbitMQ Connected");
-      return;
-    } catch (err) {
-      console.error(
-        `RabbitMQ not ready. Retrying in ${delay / 1000}s... (${retries} retries left)`
-      );
-      retries -= 1;
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
-  }
-  console.error(" RabbitMQ Connection Failed after multiple retries.");
-};
-
-/* Start Server */
-const startServer = async () => {
-  try {
-    await connectMongoDB();
-    await connectRedis();
-    await connectRabbitMQ();
-
-    app.listen(PORT, () => {
-      console.log(` Auth Service running on port ${PORT}`);
-    });
-  } catch (err) {
-    console.error(" Failed to start server:", err);
-  }
-};
-
-startServer();
+start();

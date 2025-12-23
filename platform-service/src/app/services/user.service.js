@@ -15,11 +15,11 @@ export default class UserService {
     try { this.redis = getRedisClient(); } catch (e) { this.redis = null; }
   }
 
-  async register({ name, email, password }) {
+  async register({ name, email, password, role }) {
     const existing = await this.userRepo.findByEmail(email);
     if (existing) throw new AppError('Email already registered', 400);
     const hashed = await bcrypt.hash(password, 10);
-    const user = await this.userRepo.create({ name, email, password: hashed });
+    const user = await this.userRepo.create({ name, email, password: hashed, role });
     if (this.redis) {
       await this.redis.set(`user:${user._id}`, JSON.stringify({
         id: user._id, name: user.name, email: user.email, role: user.role
@@ -29,10 +29,11 @@ export default class UserService {
       userId: user._id.toString(),
       email: user.email,
       name: user.name,
+      role: user.role,
       createdAt: user.createdAt.toISOString()
     });
     await publish('user.events', event);
-    return { id: user._id, name: user.name, email: user.email };
+    return { id: user._id, name: user.name, email: user.email, role: user.role };
   }
 
   async getProfile(userId) {

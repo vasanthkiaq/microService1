@@ -1,6 +1,6 @@
 export default class UserCreatedEvent {
-  constructor({ userId, email, name, createdAt }) {
+  constructor({ userId, email, name, role, createdAt }) {
     this.type = 'user.created';
-    this.payload = { userId, email, name, createdAt };
+    this.payload = { userId, email, name, role, createdAt };
   }
 }
